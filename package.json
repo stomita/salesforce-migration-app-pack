@@ -1,0 +1,13 @@
+{
+  "name": "salesforce-migration-app-pack",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "jsforce": "^2.0.0-beta.8",
+    "salesforce-migration-automatic": "^3.1.3"
+  }
+}
