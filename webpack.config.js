@@ -13,6 +13,10 @@ module.exports = {
       },
     ],
   },
+  output: {
+    filename: "migration-app-pack.js",
+    path: __dirname + "/dist",
+  },
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx"],
   },
@@ -20,10 +24,10 @@ module.exports = {
   plugins: [
     new NodePolyfillPlugin(),
     new webpack.EnvironmentPlugin({
-      SF_USERNAME: process.env.SF_USERNAME,
-      SF_PASSWORD: process.env.SF_PASSWORD,
-      SF_LOGIN_URL: process.env.SF_LOGIN_URL,
-      SF_AJAX_PROXY: process.env.SF_AJAX_PROXY,
+      SF_USERNAME: process.env.SF_USERNAME ?? "",
+      SF_PASSWORD: process.env.SF_PASSWORD ?? "",
+      SF_LOGIN_URL: process.env.SF_LOGIN_URL ?? "",
+      SF_AJAX_PROXY: process.env.SF_AJAX_PROXY ?? "",
     }),
   ],
 };
