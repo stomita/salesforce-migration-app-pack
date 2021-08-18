@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
 import AdmZip from "adm-zip";
-import { Connection, DeployResult } from "jsforce";
+import { Connection } from "jsforce";
 import {
   RecordMappingPolicy,
   UploadInput,
@@ -18,7 +18,7 @@ function randid() {
   return id;
 }
 
-function buildUploadPage(
+function buildCommanderPage(
   staticResourceName: string,
   inputs: UploadInput[],
   mappings: RecordMappingPolicy[] = [],
@@ -28,25 +28,26 @@ function buildUploadPage(
 <apex:page docType="html-5.0"
 	sidebar="false"
 	cache="true"
-	title="Migration Data Upload"
+	title="Migration Commander"
 >
 <apex:slds />
+<div>Package created at: ${new Date().toLocaleString()}</div>
 <div id="root"></div>
 <script>
 window.migrationAppPackConfig = {
-	accessToken: '{!$Api.Session_Id}',
-	instanceUrl: '{!$Site.Prefix}',
-	assetRoot: '{!URLFOR($Asset.SLDS)}',
-	fileUrls: [
-		${inputs
+  accessToken: '{!$Api.Session_Id}',
+  instanceUrl: '{!$Site.Prefix}',
+  assetRoot: '{!URLFOR($Asset.SLDS)}',
+  fileUrls: [
+    ${inputs
       .map(
         (input) =>
           `"{!URLFOR($Resource.${staticResourceName}, 'data/${input.object}.csv')}"`,
       )
-      .join(",\n		")}
+      .join(",\n    ")}
 	],
-	mappings: ${JSON.stringify(mappings)},
-	options: ${JSON.stringify(options)}
+  mappings: ${JSON.stringify(mappings)},
+  options: ${JSON.stringify(options)}
 };
 </script>
 <script src="{!URLFOR($Resource.${staticResourceName}, 'scripts/migration-app-pack.js')}"></script> 
@@ -54,16 +55,31 @@ window.migrationAppPackConfig = {
 	`.trim();
 }
 
-function buildUploadPageXml(visualforcePageName: string, apiVersion: string) {
+function buildCommanderPageXml(
+  visualforcePageName: string,
+  apiVersion: string,
+) {
   return `
 <?xml version="1.0" encoding="UTF-8"?>
 <ApexPage xmlns="http://soap.sforce.com/2006/04/metadata">
-    <apiVersion>${apiVersion}</apiVersion>
-    <availableInTouch>false</availableInTouch>
-    <confirmationTokenRequired>false</confirmationTokenRequired>
-		<label>${visualforcePageName}</label>
+  <apiVersion>${apiVersion}</apiVersion>
+  <availableInTouch>false</availableInTouch>
+  <confirmationTokenRequired>false</confirmationTokenRequired>
+  <label>${visualforcePageName}</label>
 </ApexPage>
 	`.trim();
+}
+
+function buildCommanderTabXml(tabLabel: string, visualforcePageName: string) {
+  return `
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
+  <label>${tabLabel}</label>
+  <mobileReady>false</mobileReady>
+  <motif>Custom204: TV Widescreen</motif>
+  <page>${visualforcePageName}</page>
+</CustomTab>
+`.trim();
 }
 
 async function buildStaticResource(inputs: UploadInput[]) {
@@ -84,8 +100,8 @@ function buildStaticResourceXml() {
   return `
 <?xml version="1.0" encoding="UTF-8"?>
 <StaticResource xmlns="http://soap.sforce.com/2006/04/metadata">
-    <cacheControl>Private</cacheControl>
-    <contentType>application/zip</contentType>
+  <cacheControl>Private</cacheControl>
+  <contentType>application/zip</contentType>
 </StaticResource>
 `.trim();
 }
@@ -98,19 +114,17 @@ function buildPackageXml(
   return `
 <?xml version="1.0" encoding="UTF-8"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
-		${types
-      .map(
-        ({ name, members }) =>
-          `<types>
-				<name>${name}</name>
-        ${members
-          .map((member) => `<members>${member}</members>`)
-          .join("\n        ")}
-	  </types>`,
-      )
-      .join("\n    ")}
-	  <version>${apiVersion}</version>
-	  <fullName>${packageName}</fullName>
+  ${types
+    .map(
+      ({ name, members }) =>
+        `<types>
+    <name>${name}</name>
+    ${members.map((member) => `<members>${member}</members>`).join("\n    ")}
+  </types>`,
+    )
+    .join("\n    ")}
+  <version>${apiVersion}</version>
+  <fullName>${packageName}</fullName>
 </Package>
 	`.trim();
 }
@@ -125,33 +139,47 @@ export async function createPackage(
     mappings?: RecordMappingPolicy[];
     options?: UploadOptions;
     packageName?: string;
+    commanderTabLabel?: string;
   },
 ) {
-  const { inputs, mappings, options, packageName: packageName_ } = params;
+  const {
+    inputs,
+    mappings,
+    options,
+    packageName: packageName_,
+    commanderTabLabel: tabLabel_,
+  } = params;
   const packid = randid();
-  const packagePrefix = `MigrationApp_${packid}`;
-  const packageName = packageName_ || `Migration App (${packid})`;
+  const packagePrefix = `DataMigrationPack_${packid}`;
+  const packageName = packageName_ || `Data Migration Pack (${packid})`;
   const staticResourceName = `${packagePrefix}_Files`;
-  const vfPageName = `${packagePrefix}_UploadPage`;
-  const vfPageLabel = `Migration Data Upload Page (${packid})`;
+  const tabLabel = tabLabel_ || "Migration Commander";
+  const tabName = `${packagePrefix}_CommanderTab`;
+  const pageLabel = `${tabLabel} Page`;
+  const pageName = `${packagePrefix}_CommanderPage`;
 
   const pkgZip = new AdmZip();
   // Visualforce Page
-  const vfPageContent = buildUploadPage(
+  const pageContent = buildCommanderPage(
     staticResourceName,
     inputs,
     mappings,
     options,
   );
-  console.log(vfPageContent);
   pkgZip.addFile(
-    path.join("pages", `${vfPageName}.page`),
-    Buffer.from(vfPageContent),
+    path.join("pages", `${pageName}.page`),
+    Buffer.from(pageContent),
   );
-  const vfPageXml = buildUploadPageXml(vfPageLabel, conn.version);
+  const pageXml = buildCommanderPageXml(pageLabel, conn.version);
   pkgZip.addFile(
-    path.join("pages", `${vfPageName}.page-meta.xml`),
-    Buffer.from(vfPageXml),
+    path.join("pages", `${pageName}.page-meta.xml`),
+    Buffer.from(pageXml),
+  );
+  // Custom Tab
+  const tabXml = buildCommanderTabXml(tabLabel, pageName);
+  pkgZip.addFile(
+    path.join("tabs", `${tabName}.tab-meta.xml`),
+    Buffer.from(tabXml),
   );
   // Static Resource
   const staticResource = await buildStaticResource(inputs);
@@ -168,11 +196,15 @@ export async function createPackage(
   const types = [
     {
       name: "ApexPage",
-      members: [vfPageName],
+      members: [pageName],
     },
     {
       name: "StaticResource",
       members: [staticResourceName],
+    },
+    {
+      name: "CustomTab",
+      members: [tabName],
     },
   ];
   const packageXml = buildPackageXml(types, packageName, conn.version);
