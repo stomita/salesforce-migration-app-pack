@@ -119,13 +119,17 @@ function buildPackageXml(
  */
 export async function createPackage(
   conn: Connection,
-  inputs: UploadInput[],
-  mappings?: RecordMappingPolicy[],
-  options?: UploadOptions,
+  params: {
+    inputs: UploadInput[];
+    mappings?: RecordMappingPolicy[];
+    options?: UploadOptions;
+    packageName?: string;
+  },
 ) {
+  const { inputs, mappings, options, packageName: packageName_ } = params;
   const packid = randid();
   const packagePrefix = `MigrationApp_${packid}`;
-  const packageName = `Migration App (${packid})`;
+  const packageName = packageName_ || `Migration App (${packid})`;
   const staticResourceName = `${packagePrefix}_Files`;
   const vfPageName = `${packagePrefix}_UploadPage`;
   const vfPageLabel = `Migration Data Upload Page (${packid})`;
@@ -171,8 +175,6 @@ export async function createPackage(
   ];
   const packageXml = buildPackageXml(types, packageName, conn.version);
   pkgZip.addFile("package.xml", Buffer.from(packageXml));
-  conn.metadata.pollInterval = 10000;
-  conn.metadata.pollTimeout = 300000;
   const ret = await conn.metadata
     .deploy(pkgZip.toBuffer(), {
       singlePackage: true,
@@ -180,5 +182,17 @@ export async function createPackage(
     })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .complete({ details: true } as any);
-  return ret;
+  if (ret.state === "Succeeded") {
+    const packageInfo = await conn.tooling
+      .sobject("MetadataPackage")
+      .findOne({ Name: packageName }, [
+        "Id",
+        "Name",
+        "NamespacePrefix",
+        "PackageCategory",
+        "SystemModstamp",
+      ]);
+    return { ...ret, packageInfo };
+  }
+  return { ...ret, packageInfo: null };
 }
