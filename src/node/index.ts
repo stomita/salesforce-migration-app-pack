@@ -180,6 +180,5 @@ export async function createPackage(
     })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .complete({ details: true } as any);
-  console.log("deployed", ret);
   return ret;
 }
