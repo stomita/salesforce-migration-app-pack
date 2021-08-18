@@ -18,6 +18,44 @@ function randid() {
   return id;
 }
 
+async function findExistingPackagePrefix(
+  conn: Connection,
+  packageName: string,
+) {
+  type RetrieveResult = {
+    id: string;
+    success: string | boolean;
+    done: string | boolean;
+    fileProperties?: Array<{
+      fullName: string;
+    }>;
+  };
+  const ret = await conn.metadata.retrieve({
+    singlePackage: true,
+    packageNames: [packageName],
+  });
+  const timeoutAt = Date.now() + 300000;
+  let result: RetrieveResult;
+  do {
+    await delay(5000);
+    result = (await conn.metadata.checkRetrieveStatus(
+      ret.id,
+    )) as unknown as RetrieveResult;
+  } while (String(result.done) !== "true" && Date.now() < timeoutAt);
+  const fileProperties = !result.fileProperties
+    ? []
+    : Array.isArray(result.fileProperties)
+    ? result.fileProperties
+    : [result.fileProperties];
+  for (const file of fileProperties) {
+    const m = file.fullName.match(/^DataMigrationPack_[0-9a-z]+/);
+    if (m) {
+      return m[0];
+    }
+  }
+  return null;
+}
+
 function buildCommanderPage(
   staticResourceName: string,
   inputs: UploadInput[],
@@ -150,7 +188,10 @@ export async function createPackage(
     commanderTabLabel: tabLabel_,
   } = params;
   const packid = randid();
-  const packagePrefix = `DataMigrationPack_${packid}`;
+  const packagePrefix =
+    (packageName_
+      ? await findExistingPackagePrefix(conn, packageName_)
+      : null) ?? `DataMigrationPack_${packid}`;
   const packageName = packageName_ || `Data Migration Pack (${packid})`;
   const staticResourceName = `${packagePrefix}_Files`;
   const tabLabel = tabLabel_ || "Migration Commander";
