@@ -1,12 +1,13 @@
 import fs from "fs-extra";
 import path from "path";
 import AdmZip from "adm-zip";
-import { Connection } from "jsforce";
+import { Connection, DeployResult } from "jsforce";
 import {
   RecordMappingPolicy,
   UploadInput,
   UploadOptions,
 } from "salesforce-migration-automatic";
+import { delay } from "../util";
 
 function randid() {
   const chars = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -42,10 +43,10 @@ window.migrationAppPackConfig = {
         (input) =>
           `"{!URLFOR($Resource.${staticResourceName}, 'data/${input.object}.csv')}"`,
       )
-      .join(",\n    ")}
+      .join(",\n		")}
 	],
-	mappings: {!JSENCODE('${JSON.stringify(mappings)}')},
-	options: {!JSENCODE('${JSON.stringify(options)}')}
+	mappings: ${JSON.stringify(mappings)},
+	options: ${JSON.stringify(options)}
 };
 </script>
 <script src="{!URLFOR($Resource.${staticResourceName}, 'scripts/migration-app-pack.js')}"></script> 
@@ -142,6 +143,7 @@ export async function createPackage(
     mappings,
     options,
   );
+  console.log(vfPageContent);
   pkgZip.addFile(
     path.join("pages", `${vfPageName}.page`),
     Buffer.from(vfPageContent),
@@ -175,24 +177,21 @@ export async function createPackage(
   ];
   const packageXml = buildPackageXml(types, packageName, conn.version);
   pkgZip.addFile("package.xml", Buffer.from(packageXml));
-  const ret = await conn.metadata
-    .deploy(pkgZip.toBuffer(), {
-      singlePackage: true,
-      rollbackOnError: true,
-    })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .complete({ details: true } as any);
-  if (ret.state === "Succeeded") {
+  const ret = await conn.metadata.deploy(pkgZip.toBuffer(), {
+    singlePackage: true,
+    rollbackOnError: true,
+  });
+  let result;
+  const timeoutAt = Date.now() + 300000;
+  do {
+    result = await conn.metadata.checkDeployStatus(ret.id, true);
+    await delay(10000);
+  } while (!result.done && Date.now() < timeoutAt);
+  if (result.success) {
     const packageInfo = await conn.tooling
       .sobject("MetadataPackage")
-      .findOne({ Name: packageName }, [
-        "Id",
-        "Name",
-        "NamespacePrefix",
-        "PackageCategory",
-        "SystemModstamp",
-      ]);
-    return { ...ret, packageInfo };
+      .findOne({ Name: packageName });
+    return { ...result, packageInfo };
   }
-  return { ...ret, packageInfo: null };
+  return { ...result, packageInfo: null };
 }

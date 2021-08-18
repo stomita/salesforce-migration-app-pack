@@ -29,6 +29,6 @@ Id,FirstName,LastName,Email,AccountId
       ],
     });
     expect(ret).not.toBeNull();
-    expect(ret.state).toBe("Succeeded");
+    expect(ret.success).toBeTruthy();
   });
 });
