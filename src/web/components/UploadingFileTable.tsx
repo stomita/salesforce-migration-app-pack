@@ -48,9 +48,11 @@ export const UploadFileTable: React.FC = () => {
             </td>
             <td data-label="Stored Record Count">
               <span>{count ?? "-"}</span>
-              <span className="slds-p-left_medium">
-                (<a onClick={() => onDeleteRecords(object)}>Delete</a>)
-              </span>
+              {object ? (
+                <span className="slds-p-left_medium">
+                  (<a onClick={() => onDeleteRecords(object)}>Delete</a>)
+                </span>
+              ) : undefined}
             </td>
           </tr>
         ))}
