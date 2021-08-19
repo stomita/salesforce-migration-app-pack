@@ -49,7 +49,7 @@ export const App: React.FC = () => {
   );
   return (
     <>
-      <Card title="Upload CSV Data" footer={footer}>
+      <Card title="Load CSV Data as Records" footer={footer}>
         <UploadEntriesTable />
       </Card>
       <UploadProgressIndicator />

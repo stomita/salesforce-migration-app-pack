@@ -1,4 +1,5 @@
 import React from "react";
+import { formatNumber } from "../../util";
 import { useDeleteRecordsAction, useUploadEntries } from "../hooks/upload";
 
 /**
@@ -20,8 +21,8 @@ export const UploadEntriesTable: React.FC = () => {
             </div>
           </th>
           <th className="" scope="col">
-            <div className="slds-truncate" title="Records to Load">
-              Records to Load
+            <div className="slds-truncate" title="Num of Loading Rows">
+              Num of Loading Rows
             </div>
           </th>
           <th className="" scope="col">
@@ -30,25 +31,29 @@ export const UploadEntriesTable: React.FC = () => {
             </div>
           </th>
           <th className="" scope="col">
-            <div className="slds-truncate" title="Stored Record Count">
-              Stored Records
+            <div className="slds-truncate" title="Num of Existing Records">
+              Num of Existing Records
             </div>
           </th>
         </tr>
       </thead>
       <tbody>
-        {entries?.map(({ filename, rows, object, count }) => (
+        {entries?.map(({ url, filename, rows, object, count }) => (
           <tr key={object} className="slds-hint-parent">
             <th data-label="File Name" scope="row">
               <div className="slds-truncate" title={filename}>
-                <a href="#" tabIndex={-1}>
-                  {filename}
-                </a>
+                {rows ? (
+                  <a href={url} tabIndex={-1}>
+                    {filename}
+                  </a>
+                ) : (
+                  filename
+                )}
               </div>
             </th>
-            <td data-label="Records to Load">
+            <td data-label="Num of Loading Rows">
               <div className="slds-truncate" title={object}>
-                {rows?.length}
+                {formatNumber(rows?.length)}
               </div>
             </td>
             <td data-label="Object Name">
@@ -56,9 +61,9 @@ export const UploadEntriesTable: React.FC = () => {
                 {object}
               </div>
             </td>
-            <td data-label="Stored Record Count">
-              <span>{count ?? "-"}</span>
-              {object && count != null ? (
+            <td data-label="Num of Existing Records">
+              <span>{formatNumber(count)}</span>
+              {object && count ? (
                 <span className="slds-p-left_medium">
                   (<a onClick={() => onDeleteRecords(object)}>Delete</a>)
                 </span>
