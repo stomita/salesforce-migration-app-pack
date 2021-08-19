@@ -1,60 +1,44 @@
-import { Connection } from "jsforce";
 import { atom, selector } from "recoil";
-import { authorizedConnectionConfigState } from "./connection";
+import csvParse from "csv-parse";
+import { delay } from "../../util";
 
 export const fileUrlsState = atom<string[]>({
   key: "fileUrls",
   default: [],
 });
 
-const timestampState = atom({
-  key: "timestamp",
-  default: Date.now(),
-});
+type CSVFileData = {
+  url: string;
+  filename: string;
+  data?: string | null;
+  headers?: string[] | null;
+  rows?: string[][] | null;
+};
 
-export const filesState = selector({
+export const filesState = selector<CSVFileData[]>({
   key: "files",
   async get({ get }) {
     const fileUrls = get(fileUrlsState);
     return Promise.all(
-      fileUrls.map(async (fileUrl) => {
-        const filename = fileUrl.split("/").pop() ?? "";
-        const res = await fetch(fileUrl);
-        const data = await res.text();
-        return { filename, url: fileUrl, data };
+      fileUrls.map(async (url) => {
+        const filename = url.split("/").pop() ?? "";
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            return { url, filename };
+          }
+          const data = await res.text();
+          const [headers, ...rows] = await new Promise<string[][]>(
+            (resolve, reject) =>
+              csvParse(data, {}, (err, records) =>
+                err ? reject(err) : resolve(records),
+              ),
+          );
+          return { url, filename, data, headers, rows };
+        } catch (e) {
+          return { url, filename };
+        }
       }),
     );
-  },
-});
-
-function isNotNullOrUndefined<T>(o: T | null | undefined): o is T {
-  return o != null;
-}
-
-export const objectsState = selector({
-  key: "objects",
-  async get({ get }) {
-    get(timestampState);
-    const files = get(filesState);
-    const connConfig = get(authorizedConnectionConfigState);
-    const conn = new Connection(connConfig);
-    return new Map(
-      (
-        await Promise.all(
-          files.map(async ({ filename }) => {
-            const object = filename.split(".")[0];
-            try {
-              const count = await conn.sobject(object).count();
-              return [filename, { object, count }] as const;
-            } catch (e) {
-              return null;
-            }
-          }),
-        )
-      ).filter(isNotNullOrUndefined),
-    );
-  },
-  set({ set }) {
-    set(timestampState, Date.now());
   },
 });

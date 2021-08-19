@@ -1,15 +1,10 @@
 import { Connection } from "jsforce";
 import { useCallback } from "react";
-import {
-  useRecoilStateLoadable,
-  useRecoilValue,
-  useResetRecoilState,
-  useSetRecoilState,
-} from "recoil";
+import { useRecoilValue, useResetRecoilState, useSetRecoilState } from "recoil";
 import { AutoMigrator } from "salesforce-migration-automatic";
-import { usePrevious } from "./common";
+import { useLatestRecoilValue } from "./common";
 import { authorizedConnectionConfigState } from "../states/connection";
-import { filesState, objectsState } from "../states/files";
+import { filesState } from "../states/files";
 import { appLoadingState } from "../states/app";
 import {
   uploadProgressState,
@@ -18,17 +13,18 @@ import {
 } from "../states/upload";
 import { useAlertControl } from "./alert";
 import { useToastControl } from "./toast";
+import { isNotNullOrUndefined } from "../../util";
+import { objectsState, uploadInputRefsState } from "../states/input";
 
-export function useUploadingEntries() {
-  const files = useRecoilValue(filesState);
-  const [loadable] = useRecoilStateLoadable(objectsState);
-  const objects_ = loadable.state === "loading" ? null : loadable.getValue();
-  const prevObjects = usePrevious(objects_);
-  const objects = objects_ ?? prevObjects ?? new Map();
-  return files.map((file) => ({
-    ...file,
-    ...objects.get(file.filename),
-  }));
+export function useUploadEntries() {
+  const uploadInputRefs = useRecoilValue(uploadInputRefsState);
+  const objects = useLatestRecoilValue(objectsState, new Map());
+  const files = useLatestRecoilValue(filesState, []);
+  return uploadInputRefs.map(({ fileIndex, object, ...input }) => {
+    const file = files[fileIndex] ?? { filename: "", url: "" };
+    const obj = objects.get(object);
+    return { object, ...input, ...file, ...obj };
+  });
 }
 
 export function useUploadStatus() {
@@ -46,12 +42,11 @@ export function useUploadAction() {
   const resetObjects = useResetRecoilState(objectsState);
   const connConfig = useRecoilValue(authorizedConnectionConfigState);
   const { showToast, hideToast } = useToastControl();
-  const files = useRecoilValue(filesState);
+  const entries = useUploadEntries();
   const onUploadData = useCallback(async () => {
-    const uploadInputs = files.map(({ filename, data }) => ({
-      object: filename.split(".")[0],
-      csvData: data,
-    }));
+    const uploadInputs = entries
+      .map(({ data, ...input }) => (data ? { ...input, csvData: data } : null))
+      .filter(isNotNullOrUndefined);
     console.log("start loading");
     hideToast();
     setUploadProgress({ totalCount: 0, successCount: 0, failureCount: 0 });
@@ -72,7 +67,7 @@ export function useUploadAction() {
       resetUploadProgress();
     }
   }, [
-    files,
+    entries,
     hideToast,
     setUploadProgress,
     connConfig,

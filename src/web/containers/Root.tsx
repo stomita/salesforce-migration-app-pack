@@ -13,6 +13,7 @@ import {
   UploadOptions,
 } from "salesforce-migration-automatic";
 import { uploadSettingsState } from "../states/upload";
+import { UploadInputRef, uploadInputRefsState } from "../states/input";
 
 export type RootProps = {
   assetRoot?: string;
@@ -23,6 +24,7 @@ export type RootProps = {
   username?: string;
   password?: string;
   fileUrls: string[];
+  inputs: UploadInputRef[];
   mappings?: RecordMappingPolicy[];
   options?: UploadOptions;
 };
@@ -37,6 +39,7 @@ export const Root: React.FC<RootProps> = (props) => {
     username,
     password,
     fileUrls,
+    inputs,
     mappings,
     options,
   } = props;
@@ -50,6 +53,7 @@ export const Root: React.FC<RootProps> = (props) => {
     });
     set(connectionCredentialsState, { username, password });
     set(fileUrlsState, fileUrls);
+    set(uploadInputRefsState, inputs);
     set(uploadSettingsState, { mappings, options });
   };
   return (

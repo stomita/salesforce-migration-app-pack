@@ -4,7 +4,7 @@ import { useToastControl, useToastMessage } from "../hooks/toast";
 import { useUploadAction } from "../hooks/upload";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Button, Card, Toast, Spinner } from "./Lightning";
-import { UploadFileTable } from "./UploadingFileTable";
+import { UploadEntriesTable } from "./UploadEntriesTable";
 import { UploadProgressIndicator } from "./UploadProgressIndicator";
 
 /**
@@ -50,7 +50,7 @@ export const App: React.FC = () => {
   return (
     <>
       <Card title="Upload CSV Data" footer={footer}>
-        <UploadFileTable />
+        <UploadEntriesTable />
       </Card>
       <UploadProgressIndicator />
       <ConfirmDialog />
