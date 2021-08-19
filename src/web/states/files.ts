@@ -27,6 +27,10 @@ export const filesState = selector({
   },
 });
 
+function isNotNullOrUndefined<T>(o: T | null | undefined): o is T {
+  return o != null;
+}
+
 export const objectsState = selector({
   key: "objects",
   async get({ get }) {
@@ -35,13 +39,19 @@ export const objectsState = selector({
     const connConfig = get(authorizedConnectionConfigState);
     const conn = new Connection(connConfig);
     return new Map(
-      await Promise.all(
-        files.map(async ({ filename }) => {
-          const object = filename.split(".")[0];
-          const count = await conn.sobject(object).count();
-          return [filename, { object, count }] as const;
-        }),
-      ),
+      (
+        await Promise.all(
+          files.map(async ({ filename }) => {
+            const object = filename.split(".")[0];
+            try {
+              const count = await conn.sobject(object).count();
+              return [filename, { object, count }] as const;
+            } catch (e) {
+              return null;
+            }
+          }),
+        )
+      ).filter(isNotNullOrUndefined),
     );
   },
   set({ set }) {
