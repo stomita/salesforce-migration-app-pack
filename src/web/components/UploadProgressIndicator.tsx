@@ -1,6 +1,7 @@
 import React from "react";
 import { useUploadAction, useUploadStatus } from "../hooks/upload";
-import { Button, Modal } from "./Lightning";
+import { Button, Modal, ProgressBar } from "./Lightning";
+import { UploadResultTables } from "./UploadResultTables";
 
 /**
  *
@@ -24,19 +25,23 @@ export const UploadProgressIndicator: React.FC = () => {
       }
     >
       {uploadProgress ? (
-        <ul>
-          <li>Total records in input: {uploadProgress.totalCount}</li>
-          <li>Successes: {uploadProgress.successCount}</li>
-          <li>Failures: {uploadProgress.failureCount}</li>
-        </ul>
+        <>
+          <ProgressBar
+            value={uploadProgress.successCount + uploadProgress.failureCount}
+            minValue={0}
+            maxValue={uploadProgress.totalCount}
+          />
+          <ul>
+            <li>Total rows in input: {uploadProgress.totalCount}</li>
+            <li>Successes: {uploadProgress.successCount}</li>
+            <li>Failures: {uploadProgress.failureCount}</li>
+          </ul>
+        </>
       ) : undefined}
       {uploadResult ? (
-        <ul>
-          <li>Total records in input: {uploadResult.totalCount}</li>
-          <li>Successes: {uploadResult.successes.length}</li>
-          <li>Failures: {uploadResult.failures.length}</li>
-          <li>Blocked: {uploadResult.blocked.length}</li>
-        </ul>
+        <>
+          <UploadResultTables {...uploadResult} />
+        </>
       ) : undefined}
     </Modal>
   );

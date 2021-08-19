@@ -6,5 +6,5 @@ type SLDSConfig = {
 
 export const sldsConfigState = atom<SLDSConfig>({
   key: "sldsConfig",
-  default: { assetRoot: "" },
+  default: { assetRoot: "/assets" },
 });
