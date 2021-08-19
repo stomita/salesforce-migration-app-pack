@@ -62,6 +62,11 @@ function buildCommanderPage(
   mappings: RecordMappingPolicy[] = [],
   options: UploadOptions = {},
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const inputRefs = inputs.map(({ csvData, ...inputs }, i) => ({
+    ...inputs,
+    fileIndex: i,
+  }));
   return `
 <apex:page docType="html-5.0"
 	sidebar="false"
@@ -84,6 +89,7 @@ window.migrationAppPackConfig = {
       )
       .join(",\n    ")}
 	],
+  inputs: ${JSON.stringify(inputRefs)},
   mappings: ${JSON.stringify(mappings)},
   options: ${JSON.stringify(options)}
 };
