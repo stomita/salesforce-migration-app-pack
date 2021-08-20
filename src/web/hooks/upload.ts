@@ -97,7 +97,12 @@ export function useDeleteRecordsAction() {
       const conn = new Connection(connConfig);
       setAppLoading(true);
       try {
-        await conn.sobject(objectName).find().destroy();
+        const recs = await conn.sobject(objectName).find({}, "Id");
+        const ids = recs.map((r) => r.Id as string);
+        await conn
+          .sobject(objectName)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .destroy(ids, { allowRecursive: true } as any);
         resetObjects();
       } catch (e) {
         showToast({ type: "error", message: e.message });
