@@ -213,30 +213,21 @@ export async function createPackage(
     mappings,
     options,
   );
-  pkgZip.addFile(
-    path.join("pages", `${pageName}.page`),
-    Buffer.from(pageContent),
-  );
+  pkgZip.addFile(`pages/${pageName}.page`, Buffer.from(pageContent));
   const pageXml = buildCommanderPageXml(pageLabel, conn.version);
-  pkgZip.addFile(
-    path.join("pages", `${pageName}.page-meta.xml`),
-    Buffer.from(pageXml),
-  );
+  pkgZip.addFile(`pages/${pageName}.page-meta.xml`, Buffer.from(pageXml));
   // Custom Tab
   const tabXml = buildCommanderTabXml(tabLabel, pageName);
-  pkgZip.addFile(
-    path.join("tabs", `${tabName}.tab-meta.xml`),
-    Buffer.from(tabXml),
-  );
+  pkgZip.addFile(`tabs/${tabName}.tab-meta.xml`, Buffer.from(tabXml));
   // Static Resource
   const staticResource = await buildStaticResource(inputs);
   pkgZip.addFile(
-    path.join("staticresources", `${staticResourceName}.resource`),
+    `staticresources/${staticResourceName}.resource`,
     staticResource,
   );
   const staticResourceXml = await buildStaticResourceXml();
   pkgZip.addFile(
-    path.join("staticresources", `${staticResourceName}.resource-meta.xml`),
+    `staticresources/${staticResourceName}.resource-meta.xml`,
     Buffer.from(staticResourceXml),
   );
   // package.xml
