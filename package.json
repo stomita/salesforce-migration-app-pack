@@ -1,6 +1,6 @@
 {
   "name": "salesforce-migration-app-pack",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "main": "build/node/index.js",
   "types": "build/node/index.d.ts",
   "scripts": {
