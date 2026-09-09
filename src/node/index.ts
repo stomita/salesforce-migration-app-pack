@@ -1,13 +1,11 @@
 import fs from "fs-extra";
 import path from "path";
 import AdmZip from "adm-zip";
-import { Connection } from "jsforce";
 import {
   RecordMappingPolicy,
   UploadInput,
   UploadOptions,
 } from "salesforce-migration-automatic";
-import { delay } from "../util";
 
 function randid() {
   const chars = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -16,44 +14,6 @@ function randid() {
     id += chars[Math.floor(Math.random() * chars.length)];
   }
   return id;
-}
-
-async function findExistingPackagePrefix(
-  conn: Connection,
-  packageName: string,
-) {
-  type RetrieveResult = {
-    id: string;
-    success: string | boolean;
-    done: string | boolean;
-    fileProperties?: Array<{
-      fullName: string;
-    }>;
-  };
-  const ret = await conn.metadata.retrieve({
-    singlePackage: true,
-    packageNames: [packageName],
-  });
-  const timeoutAt = Date.now() + 300000;
-  let result: RetrieveResult;
-  do {
-    await delay(5000);
-    result = (await conn.metadata.checkRetrieveStatus(
-      ret.id,
-    )) as unknown as RetrieveResult;
-  } while (String(result.done) !== "true" && Date.now() < timeoutAt);
-  const fileProperties = !result.fileProperties
-    ? []
-    : Array.isArray(result.fileProperties)
-    ? result.fileProperties
-    : [result.fileProperties];
-  for (const file of fileProperties) {
-    const m = file.fullName.match(/^DataMigrationPack_[0-9a-z]+/);
-    if (m) {
-      return m[0];
-    }
-  }
-  return null;
 }
 
 function buildCommanderPage(
@@ -152,7 +112,6 @@ function buildStaticResourceXml() {
 
 function buildPackageXml(
   types: Array<{ name: string; members: string[] }>,
-  packageName: string,
   apiVersion = "50.0",
 ) {
   return `
@@ -168,44 +127,45 @@ function buildPackageXml(
     )
     .join("\n    ")}
   <version>${apiVersion}</version>
-  <fullName>${packageName}</fullName>
 </Package>
 	`.trim();
 }
 
+export type PackageFile = {
+  path: string;
+  content: Buffer;
+};
+
+export type PackageBuildParams = {
+  inputs: UploadInput[];
+  mappings?: RecordMappingPolicy[];
+  options?: UploadOptions;
+  apiVersion: string;
+  /** prefix of API names of generated components (default: `DataMigrationPack_<random>`) */
+  packagePrefix?: string;
+  commanderTabLabel?: string;
+};
+
 /**
- *
+ * Build metadata files (in metadata API format) of the migration app package
  */
-export async function createPackage(
-  conn: Connection,
-  params: {
-    inputs: UploadInput[];
-    mappings?: RecordMappingPolicy[];
-    options?: UploadOptions;
-    packageName?: string;
-    commanderTabLabel?: string;
-  },
-) {
+export async function buildPackageFiles(params: PackageBuildParams) {
   const {
     inputs,
     mappings,
     options,
-    packageName: packageName_,
+    apiVersion,
+    packagePrefix: packagePrefix_,
     commanderTabLabel: tabLabel_,
   } = params;
-  const packid = randid();
-  const packagePrefix =
-    (packageName_
-      ? await findExistingPackagePrefix(conn, packageName_)
-      : null) ?? `DataMigrationPack_${packid}`;
-  const packageName = packageName_ || `Data Migration Pack (${packid})`;
+  const packagePrefix = packagePrefix_ ?? `DataMigrationPack_${randid()}`;
   const staticResourceName = `${packagePrefix}_Files`;
   const tabLabel = tabLabel_ || "Migration Commander";
   const tabName = `${packagePrefix}_CommanderTab`;
   const pageLabel = `${tabLabel} Page`;
   const pageName = `${packagePrefix}_CommanderPage`;
 
-  const pkgZip = new AdmZip();
+  const files: PackageFile[] = [];
   // Visualforce Page
   const pageContent = buildCommanderPage(
     staticResourceName,
@@ -213,23 +173,32 @@ export async function createPackage(
     mappings,
     options,
   );
-  pkgZip.addFile(`pages/${pageName}.page`, Buffer.from(pageContent));
-  const pageXml = buildCommanderPageXml(pageLabel, conn.version);
-  pkgZip.addFile(`pages/${pageName}.page-meta.xml`, Buffer.from(pageXml));
+  files.push({
+    path: `pages/${pageName}.page`,
+    content: Buffer.from(pageContent),
+  });
+  const pageXml = buildCommanderPageXml(pageLabel, apiVersion);
+  files.push({
+    path: `pages/${pageName}.page-meta.xml`,
+    content: Buffer.from(pageXml),
+  });
   // Custom Tab
   const tabXml = buildCommanderTabXml(tabLabel, pageName);
-  pkgZip.addFile(`tabs/${tabName}.tab-meta.xml`, Buffer.from(tabXml));
+  files.push({
+    path: `tabs/${tabName}.tab-meta.xml`,
+    content: Buffer.from(tabXml),
+  });
   // Static Resource
   const staticResource = await buildStaticResource(inputs);
-  pkgZip.addFile(
-    `staticresources/${staticResourceName}.resource`,
-    staticResource,
-  );
+  files.push({
+    path: `staticresources/${staticResourceName}.resource`,
+    content: staticResource,
+  });
   const staticResourceXml = await buildStaticResourceXml();
-  pkgZip.addFile(
-    `staticresources/${staticResourceName}.resource-meta.xml`,
-    Buffer.from(staticResourceXml),
-  );
+  files.push({
+    path: `staticresources/${staticResourceName}.resource-meta.xml`,
+    content: Buffer.from(staticResourceXml),
+  });
   // package.xml
   const types = [
     {
@@ -245,23 +214,19 @@ export async function createPackage(
       members: [tabName],
     },
   ];
-  const packageXml = buildPackageXml(types, packageName, conn.version);
-  pkgZip.addFile("package.xml", Buffer.from(packageXml));
-  const ret = await conn.metadata.deploy(pkgZip.toBuffer(), {
-    singlePackage: true,
-    rollbackOnError: true,
-  });
-  let result;
-  const timeoutAt = Date.now() + 300000;
-  do {
-    result = await conn.metadata.checkDeployStatus(ret.id, true);
-    await delay(10000);
-  } while (!result.done && Date.now() < timeoutAt);
-  if (result.success) {
-    const packageInfo = await conn.tooling
-      .sobject("MetadataPackage")
-      .findOne({ Name: packageName });
-    return { ...result, packageInfo };
+  const packageXml = buildPackageXml(types, apiVersion);
+  files.push({ path: "package.xml", content: Buffer.from(packageXml) });
+  return { packagePrefix, files };
+}
+
+/**
+ * Build zipped metadata package (in metadata API format) of the migration app package
+ */
+export async function buildPackageZip(params: PackageBuildParams) {
+  const { packagePrefix, files } = await buildPackageFiles(params);
+  const pkgZip = new AdmZip();
+  for (const { path: filePath, content } of files) {
+    pkgZip.addFile(filePath, content);
   }
-  return { ...result, packageInfo: null };
+  return { packagePrefix, zip: pkgZip.toBuffer() };
 }
