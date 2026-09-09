@@ -79,7 +79,6 @@ function buildCommanderTabXml(tabLabel: string, visualforcePageName: string) {
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
   <label>${tabLabel}</label>
-  <mobileReady>false</mobileReady>
   <motif>Custom204: TV Widescreen</motif>
   <page>${visualforcePageName}</page>
 </CustomTab>
