@@ -61,7 +61,7 @@ export function useUploadAction() {
       setUploadResult(result);
       resetObjects();
     } catch (e) {
-      showToast({ type: "error", message: e.message });
+      showToast({ type: "error", message: (e as Error).message });
     } finally {
       console.log("loading completed");
       resetUploadProgress();
@@ -105,7 +105,7 @@ export function useDeleteRecordsAction() {
           .destroy(ids, { allowRecursive: true } as any);
         resetObjects();
       } catch (e) {
-        showToast({ type: "error", message: e.message });
+        showToast({ type: "error", message: (e as Error).message });
       } finally {
         setAppLoading(false);
       }

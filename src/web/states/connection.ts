@@ -35,7 +35,7 @@ export const authorizedConnectionConfigState = selector<ConnectionConfig>({
     }
     return {
       ...config,
-      accessToken: conn.accessToken,
+      accessToken: conn.accessToken ?? undefined,
       instanceUrl: conn.instanceUrl,
     };
   },

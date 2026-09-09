@@ -2,7 +2,7 @@
 const webpack = require("webpack");
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 
-module.exports = {
+module.exports = (env, argv) => ({
   mode: "development",
   entry: "./src/web/index.tsx",
   module: {
@@ -10,6 +10,11 @@ module.exports = {
       {
         test: /\.tsx?$/,
         use: "babel-loader",
+      },
+      {
+        // ESM dependencies (csv-parse, csv-stringify) import node polyfills without extension
+        test: /\.m?js$/,
+        resolve: { fullySpecified: false },
       },
     ],
   },
@@ -20,7 +25,7 @@ module.exports = {
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx"],
   },
-  devtool: "inline-source-map",
+  devtool: argv.mode === "production" ? false : "inline-source-map",
   plugins: [
     new NodePolyfillPlugin(),
     new webpack.EnvironmentPlugin({
@@ -30,4 +35,4 @@ module.exports = {
       SF_AJAX_PROXY: process.env.SF_AJAX_PROXY ?? "",
     }),
   ],
-};
+});
